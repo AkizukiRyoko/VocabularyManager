@@ -206,10 +206,22 @@ struct Word
                 case seek_item_content:
                 {
                     if(isblank(c) || c =='\n') break;
-                    if(c == ';')
+                    if(c == '.')
                     {
                         state = seek_item_content;
                         std::cerr << "warning: blank item content." << std::endl;
+                        break;
+                    }
+                    if(c == ':')
+                    {
+                        state = begin_item_title;
+                        std::cerr << "warning: item entity unexpectedly ended with':'." << std::endl;
+                        break;
+                    }
+                    if(c == ']')
+                    {
+                        state = block_ended;
+                        std::cerr << "warning: item entity unexpectedly ended with']'." << std::endl;
                         break;
                     }
                     state = read_item_content;
@@ -219,7 +231,7 @@ struct Word
                 }
                 case read_item_content:
                 {
-                    if(c == ';' || c =='.')
+                    if(c =='.')
                     {
                         if(word_stack.empty())
                         {
@@ -232,7 +244,8 @@ struct Word
                         std::cerr << "pop item content" << std::endl;
                         if(word_stack.back() == "defi")
                             /*w.defi.push_back(std::move(s));*/
-                        {}
+                        {
+                        }
                         else if(word_stack.back() == "coll")
                             w.coll.insert(std::move(s));
                         else if(word_stack.back() == "exam")
@@ -241,16 +254,8 @@ struct Word
                             w.cate.insert(std::move(s));
                         else
                             std::cerr << "unrecognized item, ignored." << std::endl;
-                        if(c == '.')
-                        {
-                            word_stack.pop_back();
-                            std::cerr << "pop item title" << std::endl;
-                            state = seek_item;
-                        }
-                        else
-                        {
-                            state = seek_item_content;
-                        }
+
+                        state = seek_item_content;
                     }
                     else
                     {
@@ -288,24 +293,21 @@ int main()
 [
 word
 :defi:
-gjhjfgkfjlasf;
-fasoijidjsaofoa;
-foiadjsfoifjsoid.
-:coll:
-fdsdssff fdfdfsfdsff;
-fdsjfdsojd dfdsf5fds9;
-fdjffjds.
+gjhjfgkfjlasf.
+fasoijidjsaofoa.
+foiadjsfoifjsoid
+:coll:fdsdssff fdfdfsfdsff.fdsjfdsojd dfdsf5fds9.fdjffjds
 ]
 
 [
     word
-    :  defi:gjhjfgkfjlasf;fasoijidjsaofoa;foiadjsfoifjsoid.
-    :coll:fdsdssff fdfdfsfdsff; fdsjfdsojd dfdsf5fds9; fdjffjds.
+    :  defi:gjhjfgkfjlasf.fasoijidjsaofoa.foiadjsfoifjsoid.
+    :coll:fdsdssff fdffdgfdfdfsfdsff.fdfdfgggggsjfdsojd dfdsf5fds9. fdhkkjffjds.
 ]
 [
     set
-    :  defi:gjhjfgkfjlasf;fasoijidjsaofoa;foiadjsfoifjsoid.
-    :coll:fdsdssff fdfdfsfdsff; fdsjfdsojd dfdsf5fds9; fdjffjds.
+    :  defi:gjhjfgkfjlasf.fasoijidjsaofoa.foiadjsfoifjsoid.
+    :coll:fdsdssff fdfdfsfdsff. fdsjfdsojd dfdsf5fds9. fdjffjds.
 ]
 )";
 
