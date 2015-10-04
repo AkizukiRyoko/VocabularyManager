@@ -25,6 +25,7 @@
 #include <sstream>
 #include <termios.h>
 #include <unistd.h>
+#include <signal.h>
 
 enum ConsoleColorCode
 {
@@ -449,8 +450,15 @@ void disableNoncanonicalInput()
     tcsetattr(STDIN_FILENO, TCSANOW, &original_state);
 }
 
+void signalHandler(int /* signum */)
+{
+    std::cerr << "Received signal SIGINT, type '!' to exit." << std::endl;
+}
+
 int main()
 {
+    signal(SIGINT, signalHandler);
+
     std::map<std::string, Word> word_map;
     std::fstream file;
 
@@ -522,9 +530,15 @@ int main()
                     {
                         std::cerr << "word '" << FRONT_CYAN << word_stack.back() << FRONT_DEFAULT << "' not found." << std::endl;
                         auto lb = word_map.lower_bound(word_stack.back());
-                        for(; lb != word_map.end() && lb->first.find(word_stack.back()) == 0; ++lb)
+                        size_t count = 0;
+                        for(; lb != word_map.end() && lb->first.find(word_stack.back()) == 0; ++lb, ++count)
                         {
                             std::cerr << "are you finding '" << FRONT_CYAN << lb->first << FRONT_DEFAULT << "'?" << std::endl;
+                        }
+                        if(count == 1)
+                        {
+                            std::cerr << "selecting '" << FRONT_CYAN << (--lb)->first << FRONT_DEFAULT << "'." << std::endl;
+                            lb->second.print(std::cout);
                         }
                     }
                     else
