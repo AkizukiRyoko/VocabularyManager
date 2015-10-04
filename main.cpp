@@ -501,7 +501,7 @@ int main()
                 {
                     word_stack.emplace_back();
                     state_stack.emplace_back(read_word);
-                    goto begin_loop;
+                    goto begin_loop; // let other section handle this char
                 }
                 if(c == '{');
                 if(c == '[');
@@ -519,17 +519,29 @@ int main()
                     putchar('\n');
                     auto i = word_map.find(word_stack.back());
                     if(i == word_map.end())
-                        std::cerr << "word '" << word_stack.back() << "' not found." << std::endl;
+                    {
+                        std::cerr << "word '" << FRONT_CYAN << word_stack.back() << FRONT_DEFAULT << "' not found." << std::endl;
+                        auto lb = word_map.lower_bound(word_stack.back());
+                        for(; lb != word_map.end() && lb->first.find(word_stack.back()) == 0; ++lb)
+                        {
+                            std::cerr << "are you finding '" << FRONT_CYAN << lb->first << FRONT_DEFAULT << "'?" << std::endl;
+                        }
+                    }
                     else
+                    {
                         i->second.print(std::cout);
+                    }
                     word_stack.pop_back();
                     state_stack.pop_back();
                     break;
                 }
                 else if(c == 127 || c == '\b')
                 {
-                    std::cout << "\b \b";
-                    if(!word_stack.empty()) word_stack.back().pop_back();
+                    if(!word_stack.empty() && !word_stack.back().empty())
+                    {
+                        std::cout << "\b \b";
+                        word_stack.back().pop_back();
+                    }
                     break;
                 }
                 else if(c == ' ')
