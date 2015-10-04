@@ -121,7 +121,7 @@ struct Word
             void            print(std::ostream &s)
     {
         // word
-        s << word << "\n";
+        s << FRONT_CYAN << word << FRONT_DEFAULT << "\n";
         // defi
         if(defi.empty())
         {
@@ -484,15 +484,16 @@ int main()
     enum input_parse_state
     {
         wait_input,
-        read_word,
-        begin_head_word,
+        read_lookup_word,
+        add_example,
+        read_collocation,
         read_head_word,
-        end_head_word,
         bad_state
     };
     std::deque<std::string> word_stack;
     std::deque<input_parse_state> state_stack;
     state_stack.push_back(wait_input);
+    Word *cur = nullptr;
     while((c = getchar()) != '!' && c != EOF)
     {
     begin_loop:
@@ -508,14 +509,19 @@ int main()
                 if(isalpha(c))
                 {
                     word_stack.emplace_back();
-                    state_stack.emplace_back(read_word);
+                    state_stack.emplace_back(read_lookup_word);
+                    std::cerr << "lookup: ";
                     goto begin_loop; // let other section handle this char
                 }
-                if(c == '{');
-                if(c == '[');
+                if(c == '+')
+                {
+                    state_stack.emplace_back(add_example);
+                    std::cerr << "add example: ";
+                    break;
+                }
                 break;
             }
-            case read_word:
+            case read_lookup_word:
             {
                 if(word_stack.empty())
                 {
@@ -525,25 +531,28 @@ int main()
                 if(c == '\n')
                 {
                     putchar('\n');
-                    auto i = word_map.find(word_stack.back());
-                    if(i == word_map.end())
+                    if(!word_stack.back().empty())
                     {
-                        std::cerr << "word '" << FRONT_CYAN << word_stack.back() << FRONT_DEFAULT << "' not found." << std::endl;
-                        auto lb = word_map.lower_bound(word_stack.back());
-                        size_t count = 0;
-                        for(; lb != word_map.end() && lb->first.find(word_stack.back()) == 0; ++lb, ++count)
+                        auto i = word_map.find(word_stack.back());
+                        if(i == word_map.end())
                         {
-                            std::cerr << "are you finding '" << FRONT_CYAN << lb->first << FRONT_DEFAULT << "'?" << std::endl;
+                            std::cerr << "word '" << FRONT_CYAN << word_stack.back() << FRONT_DEFAULT << "' not found." << std::endl;
+                            auto lb = word_map.lower_bound(word_stack.back());
+                            size_t count = 0;
+                            for(; lb != word_map.end() && lb->first.find(word_stack.back()) == 0; ++lb, ++count)
+                            {
+                                std::cerr << "are you finding '" << FRONT_CYAN << lb->first << FRONT_DEFAULT << "'?" << std::endl;
+                            }
+                            if(count == 1)
+                            {
+                                std::cerr << "selecting '" << FRONT_CYAN << (--lb)->first << FRONT_DEFAULT << "'." << std::endl;
+                                lb->second.print(std::cout);
+                            }
                         }
-                        if(count == 1)
+                        else
                         {
-                            std::cerr << "selecting '" << FRONT_CYAN << (--lb)->first << FRONT_DEFAULT << "'." << std::endl;
-                            lb->second.print(std::cout);
+                            i->second.print(std::cout);
                         }
-                    }
-                    else
-                    {
-                        i->second.print(std::cout);
                     }
                     word_stack.pop_back();
                     state_stack.pop_back();
@@ -558,16 +567,6 @@ int main()
                     }
                     break;
                 }
-                else if(c == ' ')
-                {
-                    if(word_stack.back().back() != ' ')
-                    {
-                        putchar(' ');
-                        word_stack.back().push_back(' ');
-                    }
-                    break;
-                }
-                else if(isspace(c)) break;
                 if(!isalpha(c)) break;
                 std::cout << FRONT_CYAN << c << FRONT_DEFAULT;
                 word_stack.back().push_back(c);
