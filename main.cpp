@@ -105,7 +105,7 @@ struct Word
                     {
                         state = read_word_entity;
                         word_stack.emplace_back(1, c);
-                        std::cerr << "push word entity" << std::endl;
+                        // std::cerr << "push word entity" << std::endl;
                         break;
                     }
                     state = bad_state;
@@ -134,7 +134,7 @@ struct Word
                         }
                         w.word = std::move(word_stack.back());
                         word_stack.pop_back();
-                        std::cerr << "pop word entity" << std::endl;
+                        // std::cerr << "pop word entity" << std::endl;
                         state = seek_item;
                     }
                     break;
@@ -163,7 +163,7 @@ struct Word
                     {
                         state = read_item_title;
                         word_stack.emplace_back(1, c);
-                        std::cerr << "push item title" << std::endl;
+                        // std::cerr << "push item title" << std::endl;
                         break;
                     }
                     state = bad_state;
@@ -215,18 +215,16 @@ struct Word
                     if(c == ':')
                     {
                         state = begin_item_title;
-                        std::cerr << "warning: item entity unexpectedly ended with':'." << std::endl;
                         break;
                     }
                     if(c == ']')
                     {
                         state = block_ended;
-                        std::cerr << "warning: item entity unexpectedly ended with']'." << std::endl;
                         break;
                     }
                     state = read_item_content;
                     word_stack.emplace_back(1, c);
-                    std::cerr << "push item content" << std::endl;
+                    // std::cerr << "push item content" << std::endl;
                     break;
                 }
                 case read_item_content:
@@ -241,7 +239,7 @@ struct Word
                         }
                         auto s = word_stack.back();
                         word_stack.pop_back();
-                        std::cerr << "pop item content" << std::endl;
+                        // std::cerr << "pop item content" << std::endl;
                         if(word_stack.back() == "defi")
                             /*w.defi.push_back(std::move(s));*/
                         {
