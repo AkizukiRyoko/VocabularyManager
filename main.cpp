@@ -19,9 +19,31 @@
 #include <string>
 #include <set>
 #include <map>
+#include <vector>
 #include <deque>
 #include <cctype>
 #include <sstream>
+
+std::string getWordClass(const std::string &c)
+{
+    std::vector<const char*> classes = {
+        "n", "noun",
+        "pron", "pronoun",
+        "v", "verb",
+        "adj", "adjective",
+        "adv", "adverb",
+        "prep", "preposition",
+        "conj", "conjunction"
+    };
+    for(size_t i = 0; i < classes.size(); ++i)
+    {
+        if(c == classes[i])
+        {
+            return (i % 2 == 0) ? classes[i + 1] : classes[i];
+        }
+    }
+    return "unknown";
+}
 
 struct Word
 {
@@ -46,9 +68,7 @@ struct Word
             s << "[definitions]\n";
             for(auto i = defi.begin(); i != defi.end(); ++i)
             {
-                auto range = defi.equal_range(i->first);
-                for(auto d = range.first; d != range.second; ++d)
-                    s << d->first << ": " << d->second << '\n';
+                s << i->first << ": " << i->second << '\n';
             }
         }
         // coll
@@ -241,8 +261,24 @@ struct Word
                         word_stack.pop_back();
                         // std::cerr << "pop item content" << std::endl;
                         if(word_stack.back() == "defi")
-                            /*w.defi.push_back(std::move(s));*/
                         {
+                            size_t bracket_begin = s.find('('), bracket_end = s.find(')');
+                            if(bracket_begin == std::string::npos || bracket_end == std::string::npos)
+                            {
+                                std::cerr << "bracket not properly closed, treat as unknown class." << std::endl;
+                                w.defi.insert(std::make_pair("unknown", std::move(s)));
+                            }
+                            else
+                            {
+                                if(bracket_begin > bracket_end)
+                                {
+                                    std::cerr << "wrong bracket order, treat as unknown class." << std::endl;
+                                    w.defi.insert(std::make_pair("unknown", std::move(s)));
+                                }
+                                std::string word_class(s.begin() + bracket_begin + 1, s.begin() + bracket_end);
+                                s.erase(s.begin(), s.begin() + bracket_end + 1);
+                                w.defi.insert(std::make_pair(getWordClass(word_class), std::move(s)));
+                            }
                         }
                         else if(word_stack.back() == "coll")
                             w.coll.insert(std::move(s));
@@ -299,7 +335,7 @@ foiadjsfoifjsoid
 
 [
     word
-    :  defi:gjhjfgkfjlasf.fasoijidjsaofoa.foiadjsfoifjsoid.
+    :  defi:(n)gjhjfgkfjlasf.(adj)fasoijidjsaofoa.foiadjsfoifjsoid.
     :coll:fdsdssff fdffdgfdfdfsfdsff.fdfdfgggggsjfdsojd dfdsf5fds9. fdhkkjffjds.
 ]
 [
