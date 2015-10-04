@@ -48,7 +48,6 @@ std::string getWordClass(const std::string &c)
 struct Word
 {
     std::string                             word; // water, sun, ...
-    // std::string type; // noun, verb, ...
     std::multimap<std::string, std::string> defi; // <class, def>
     std::set<std::string>                   coll;
     std::set<std::string>                   exam;
@@ -80,6 +79,19 @@ struct Word
         // cate
         if(cate.empty()) s << "<uncategorized>\n";
         else { s << "[categories]\n"; for(auto &c : cate) s << c << "\n"; }
+    }
+
+            void        merge(Word &w)
+    {
+        if(w.word != word)
+        {
+            std::cerr << "trying to merge different words." << std::endl;
+            return;
+        }
+        defi.insert(w.defi.begin(), w.defi.end());
+        coll.insert(w.coll.begin(), w.coll.end());
+        exam.insert(w.exam.begin(), w.exam.end());
+        cate.insert(w.cate.begin(), w.cate.end());
     }
 
     friend  std::ostream&   operator<<(std::ostream &s, const Word &w)
@@ -135,7 +147,7 @@ struct Word
         char c;
         state state = seek_word_block;
         std::deque<std::string> word_stack;
-        while((c = stream.get()) != std::char_traits<char>::eof() && state != bad_state && state != block_ended)
+        while(state != bad_state && state != block_ended && (c = stream.get()) != std::char_traits<char>::eof())
         {
             switch(state)
             {
@@ -189,7 +201,10 @@ struct Word
                         w.word = std::move(word_stack.back());
                         word_stack.pop_back();
                         // std::cerr << "pop word entity" << std::endl;
-                        state = seek_item;
+                        // maybe seekg(tellg() - 1)?
+                        if(c == ':') state = begin_item_title;
+                        else if(c == ']') state = block_ended;
+                        else state = seek_item;
                     }
                     break;
                 }
@@ -355,46 +370,24 @@ struct Word
 
 int main()
 {
-    std::stringstream s;
-    s << R"(
+    std::map<std::string, Word> word_map;
+    std::fstream file;
 
-[
-word
-:defi:
-gjhjfgkfjlasf.
-fasoijidjsaofoa.
-foiadjsfoifjsoid
-:coll:fdsdssff fdfdfsfdsff.fdsjfdsojd dfdsf5fds9.fdjffjds
-]
-
-[
-    word
-    :  defi:(n)gjhjfgkfjlasf.(adj)fasoijidjsaofoa.foiadjsfoifjsoid.
-    :coll:fdsdssff fdffdgfdfdfsfdsff.fdfdfgggggsjfdsojd dfdsf5fds9. fdhkkjffjds.
-]
-[
-    set
-    :  defi:gjhjfgkfjlasf.fasoijidjsaofoa.foiadjsfoifjsoid.
-    :coll:fdsdssff fdfdfsfdsff. fdsjfdsojd dfdsf5fds9. fdjffjds.
-]
-)";
-
+    file.open("dict", std::fstream::in);
     Word w;
-    std::cout << "SECTION A" << std::endl;
-    s >> w;
-    s >> w;
-    s >> w;
-    //w.print(std::cout);
-    //std::cout << w;
-    s.str("");
-    s.clear();
-    std::cout << "SECTION B" << std::endl;
-    s << w;
-    std::cout << "SECTION C" << std::endl;
-    std::cout << s.str();
-    Word a;
-    std::cout << "SECTION D" << std::endl;
-    s >> a;
-    std::cout << "SECTION E" << std::endl;
-    std::cout << a;
+    while(file >> w)
+    {
+        word_map[w.word].merge(w);
+        w = Word();
+    }
+    file << "[word:defi:(n)a.(adj)b.]";
+    file << "[meiko]";
+    file.close();
+
+    file.open("dict", std::fstream::out);
+    for(auto i = word_map.begin(); i != word_map.end(); ++i)
+    {
+        std::cout << i->second;
+    }
+    file.close();
 }
