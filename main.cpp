@@ -23,6 +23,70 @@
 #include <deque>
 #include <cctype>
 #include <sstream>
+#include <termios.h>
+#include <unistd.h>
+
+enum ConsoleColorCode
+{
+    FG_BLACK    = 30,
+    FG_RED      = 31,
+    FG_GREEN    = 32,
+    FG_YELLOW   = 33,
+    FG_BLUE     = 34,
+    FG_MAGENTA  = 35,
+    FG_CYAN     = 36,
+    FG_WHITE    = 37,
+    FG_DEFAULT  = 39,
+    BG_BLACK    = 40,
+    BG_RED      = 41,
+    BG_GREEN    = 42,
+    BG_YELLOW   = 43,
+    BG_BLUE     = 44,
+    BG_MAGENTA  = 45,
+    BG_CYAN     = 46,
+    BG_WHITE    = 47,
+    BG_DEFAULT  = 49
+};
+
+class ConsoleColorModifier
+{
+protected:
+    ConsoleColorCode    mCode;
+    typedef ConsoleColorModifier ThisType;
+
+public:
+    ConsoleColorModifier(ConsoleColorCode code) : mCode(code) {}
+    virtual ~ConsoleColorModifier() {}
+
+    friend std::ostream& operator<<(std::ostream& os, const ThisType& mod)
+    {
+        return os << "\033[" << mod.mCode << "m";
+    }
+};
+
+ConsoleColorModifier
+    FRONT_BLACK(FG_BLACK),
+    FRONT_RED(FG_RED),
+    FRONT_GREEN(FG_GREEN),
+    FRONT_YELLOW(FG_YELLOW),
+    FRONT_BLUE(FG_BLUE),
+    FRONT_MAGENTA(FG_MAGENTA),
+    FRONT_CYAN(FG_CYAN),
+    FRONT_WHITE(FG_WHITE),
+    FRONT_DEFAULT(FG_DEFAULT)
+;
+
+ConsoleColorModifier
+    BACK_BLACK(BG_BLACK),
+    BACK_RED(BG_RED),
+    BACK_GREEN(BG_GREEN),
+    BACK_YELLOW(BG_YELLOW),
+    BACK_BLUE(BG_BLUE),
+    BACK_MAGENTA(BG_MAGENTA),
+    BACK_CYAN(BG_CYAN),
+    BACK_WHITE(BG_WHITE),
+    BACK_DEFAULT(BG_DEFAULT)
+;
 
 std::string getWordClass(const std::string &c)
 {
@@ -130,7 +194,7 @@ struct Word
 
     friend  std::istream&   operator>>(std::istream &stream, Word &w)
     {
-        enum state
+        enum stream_read_state
         {
             seek_word_block,
             seek_word_entity,
@@ -145,7 +209,7 @@ struct Word
             bad_state
         };
         char c;
-        state state = seek_word_block;
+        stream_read_state state = seek_word_block;
         std::deque<std::string> word_stack;
         while(state != bad_state && state != block_ended && (c = stream.get()) != std::char_traits<char>::eof())
         {
@@ -153,7 +217,7 @@ struct Word
             {
                 case seek_word_block:
                 {
-                    if(isblank(c) || c =='\n') break; // ignore spaces and newlines
+                    if(isspace(c)) break;
                     if(c == '[')
                     {
                         state = seek_word_entity;
@@ -166,7 +230,7 @@ struct Word
                 }
                 case seek_word_entity:
                 {
-                    if(isblank(c) || c =='\n') break; // ignore spaces and newlines
+                    if(isspace(c)) break;
                     if(isalpha(c))
                     {
                         state = read_word_entity;
@@ -210,7 +274,7 @@ struct Word
                 }
                 case seek_item:
                 {
-                    if(isblank(c) || c =='\n') break; // ignore spaces and newlines
+                    if(isspace(c)) break;
                     if(c == ':')
                     {
                         state = begin_item_title;
@@ -227,7 +291,7 @@ struct Word
                 }
                 case begin_item_title:
                 {
-                    if(isblank(c) || c =='\n') break; // ignore spaces and newlines
+                    if(isspace(c)) break;
                     if(isalpha(c))
                     {
                         state = read_item_title;
@@ -246,7 +310,7 @@ struct Word
                         word_stack.back().push_back(c);
                         break;
                     }
-                    if(isblank(c) || c =='\n')
+                    if(isspace(c))
                     {
                         state = seek_item_end;
                         break;
@@ -262,7 +326,7 @@ struct Word
                 }
                 case seek_item_end:
                 {
-                    if(isblank(c) || c =='\n') break;
+                    if(isspace(c)) break;
                     if(c == ':')
                     {
                         state = seek_item_content;
@@ -274,7 +338,7 @@ struct Word
                 }
                 case seek_item_content:
                 {
-                    if(isblank(c) || c =='\n') break;
+                    if(isspace(c)) break;
                     if(c == '.')
                     {
                         state = seek_item_content;
@@ -368,6 +432,23 @@ struct Word
     }
 };
 
+struct termios original_state;
+
+void enableNoncanonicalInput()
+{
+    struct termios tattr;
+    tcgetattr(STDIN_FILENO, &tattr);
+    tattr.c_lflag &= ~(ICANON|ECHO); /* Clear ICANON and ECHO. */
+    tattr.c_cc[VMIN] = 1;
+    tattr.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &tattr);  
+}
+
+void disableNoncanonicalInput()
+{
+    tcsetattr(STDIN_FILENO, TCSANOW, &original_state);
+}
+
 int main()
 {
     std::map<std::string, Word> word_map;
@@ -380,9 +461,45 @@ int main()
         word_map[w.word].merge(w);
         w = Word();
     }
-    file << "[word:defi:(n)a.(adj)b.]";
-    file << "[meiko]";
     file.close();
+
+    enum input_state
+    {
+        seek_word,
+        bad_state
+    };
+    input_state state = seek_word;
+    
+    if(!isatty(STDIN_FILENO))
+    {
+        std::cerr << "STDIN_FILENO is not a terminal." << std::endl;
+    }
+    tcgetattr(STDIN_FILENO, &original_state); // get current state;
+    enableNoncanonicalInput();
+
+    char c;
+    atexit(disableNoncanonicalInput);
+    while((c = getchar()) != EOF)
+    {
+        if(c == 127 || c == '\b')
+        {
+            std::cout << "\b \b";
+            continue;
+        }
+        if(!isprint(c))
+        {
+            continue;
+        }
+        switch(state)
+        {
+            case seek_word:
+            {
+                if(isspace(c)) break;
+                std::cout << FRONT_CYAN << c << FRONT_DEFAULT;
+            }
+        }
+    }
+    disableNoncanonicalInput();
 
     file.open("dict", std::fstream::out);
     for(auto i = word_map.begin(); i != word_map.end(); ++i)
