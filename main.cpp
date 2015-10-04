@@ -454,21 +454,15 @@ int main()
     std::map<std::string, Word> word_map;
     std::fstream file;
 
-    file.open("dict", std::fstream::in);
+    file.open("dict", std::ios_base::in);
     Word w;
     while(file >> w)
     {
+        word_map[w.word].word = w.word;
         word_map[w.word].merge(w);
         w = Word();
     }
     file.close();
-
-    enum input_state
-    {
-        seek_word,
-        bad_state
-    };
-    input_state state = seek_word;
     
     if(!isatty(STDIN_FILENO))
     {
@@ -476,35 +470,100 @@ int main()
     }
     tcgetattr(STDIN_FILENO, &original_state); // get current state;
     enableNoncanonicalInput();
+    atexit(disableNoncanonicalInput);
 
     char c;
-    atexit(disableNoncanonicalInput);
-    while((c = getchar()) != EOF)
+    enum input_parse_state
     {
-        if(c == 127 || c == '\b')
+        wait_input,
+        read_word,
+        begin_head_word,
+        read_head_word,
+        end_head_word,
+        bad_state
+    };
+    std::deque<std::string> word_stack;
+    std::deque<input_parse_state> state_stack;
+    state_stack.push_back(wait_input);
+    while((c = getchar()) != '!' && c != EOF)
+    {
+    begin_loop:
+        if(state_stack.empty())
         {
-            std::cout << "\b \b";
+            std::cerr << "empty state stack." << std::endl;
             continue;
         }
-        if(!isprint(c))
+        switch(state_stack.back())
         {
-            continue;
-        }
-        switch(state)
-        {
-            case seek_word:
+            case wait_input:
             {
-                if(isspace(c)) break;
+                if(isalpha(c))
+                {
+                    word_stack.emplace_back();
+                    state_stack.emplace_back(read_word);
+                    goto begin_loop;
+                }
+                if(c == '{');
+                if(c == '[');
+                break;
+            }
+            case read_word:
+            {
+                if(word_stack.empty())
+                {
+                    std::cerr << "empty word stack." << std::endl;
+                    break;
+                }
+                if(c == '\n')
+                {
+                    putchar('\n');
+                    auto i = word_map.find(word_stack.back());
+                    if(i == word_map.end())
+                        std::cerr << "word '" << word_stack.back() << "' not found." << std::endl;
+                    else
+                        i->second.print(std::cout);
+                    word_stack.pop_back();
+                    state_stack.pop_back();
+                    break;
+                }
+                else if(c == 127 || c == '\b')
+                {
+                    std::cout << "\b \b";
+                    if(!word_stack.empty()) word_stack.back().pop_back();
+                    break;
+                }
+                else if(c == ' ')
+                {
+                    if(word_stack.back().back() != ' ')
+                    {
+                        putchar(' ');
+                        word_stack.back().push_back(' ');
+                    }
+                    break;
+                }
+                else if(isspace(c)) break;
+                if(!isalpha(c)) break;
                 std::cout << FRONT_CYAN << c << FRONT_DEFAULT;
+                word_stack.back().push_back(c);
+                break;
             }
         }
     }
+
     disableNoncanonicalInput();
 
-    file.open("dict", std::fstream::out);
+    size_t i = 0;
+    char name[128] = "dict.old";
+    while(std::ifstream(name))
+    {
+        sprintf(name, "dict.old.%zd", i);
+        ++i;
+    }
+    rename("dict", name);
+    file.open("dict", std::ios_base::out);
     for(auto i = word_map.begin(); i != word_map.end(); ++i)
     {
-        std::cout << i->second;
+        file << i->second;
     }
     file.close();
 }
