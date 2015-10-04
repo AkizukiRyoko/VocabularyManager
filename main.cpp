@@ -82,6 +82,40 @@ struct Word
         else { s << "[categories]\n"; for(auto &c : cate) s << c << "\n"; }
     }
 
+    friend  std::ostream&   operator<<(std::ostream &s, const Word &w)
+    {
+        // word
+        s << "[\n" << w.word << "\n";
+        // defi
+        if(!w.defi.empty())
+        {
+            s << ":defi:\n";
+            for(auto i = w.defi.begin(); i != w.defi.end(); ++i)
+            {
+                s << "(" << i->first << ")" << i->second << ".\n";
+            }
+        }
+        // coll
+        if(!w.coll.empty())
+        {
+            s << ":coll:\n";
+            for(auto &c : w.coll) s << c << ".\n";
+        }
+        // exam
+        if(!w.exam.empty())
+        {
+            s << ":exam:\n";
+            for(auto &c : w.exam) s << c << ".\n";
+        }
+        // cate
+        if(!w.cate.empty())
+        {
+            s << ":cate:\n";
+            for(auto &c : w.cate) s << c << ".\n";
+        }
+        s << "]" << std::endl;
+    }
+
     friend  std::istream&   operator>>(std::istream &stream, Word &w)
     {
         enum state
@@ -265,7 +299,7 @@ struct Word
                             size_t bracket_begin = s.find('('), bracket_end = s.find(')');
                             if(bracket_begin == std::string::npos || bracket_end == std::string::npos)
                             {
-                                std::cerr << "bracket not properly closed, treat as unknown class." << std::endl;
+                                // std::cerr << "bracket not properly closed or not found, treat as unknown class." << std::endl;
                                 w.defi.insert(std::make_pair("unknown", std::move(s)));
                             }
                             else
@@ -346,8 +380,21 @@ foiadjsfoifjsoid
 )";
 
     Word w;
+    std::cout << "SECTION A" << std::endl;
     s >> w;
     s >> w;
     s >> w;
-    w.print(std::cout);
+    //w.print(std::cout);
+    //std::cout << w;
+    s.str("");
+    s.clear();
+    std::cout << "SECTION B" << std::endl;
+    s << w;
+    std::cout << "SECTION C" << std::endl;
+    std::cout << s.str();
+    Word a;
+    std::cout << "SECTION D" << std::endl;
+    s >> a;
+    std::cout << "SECTION E" << std::endl;
+    std::cout << a;
 }
