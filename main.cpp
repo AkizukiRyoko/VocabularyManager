@@ -879,8 +879,22 @@ int main()
                         if(!v[vo_definition].empty())
                         {
                             auto wcls = getWordClass(v[vo_word_class]);
-                            w.defi.insert(std::make_pair(wcls, v[vo_definition]));
-                            std::cout << "definition added: (" << CLAS(wcls) << ")" << DEFI(v[vo_definition]) << std::endl;
+                            auto lb = w.defi.lower_bound(wcls);
+                            auto ub = w.defi.upper_bound(wcls);
+                            bool dup = false;
+                            for(; lb != ub; ++lb)
+                            {
+                                if(lb->second == v[vo_definition])
+                                {
+                                    dup = true;
+                                    break;
+                                }
+                            }
+                            if(!dup)
+                            {
+                                w.defi.insert(std::make_pair(wcls, v[vo_definition]));
+                                std::cout << "definition added: (" << CLAS(wcls) << ")" << DEFI(v[vo_definition]) << std::endl;
+                            }
                         }
                         if(!v[vo_collocation].empty())
                         {
