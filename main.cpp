@@ -687,9 +687,11 @@ int main()
                     v.insert(v.end(), 7, std::string());
                     v[vo_state].push_back(read_sentence); // reading_state
                     v[vo_state].push_back(0); // inside_coll
+                    v[vo_state].push_back(0); // coll_only
                 }
                 auto &as = v[vo_state][0];
                 char &inside_coll = v[vo_state][1];
+                char &coll_only = v[vo_state][2];
                 // todo: multiple categories, handle backspaces
                 switch(as)
                 {
@@ -804,7 +806,7 @@ int main()
                         if(isalpha(c))
                         {
                             v[vo_collocation].push_back(c);
-                            v[vo_sentence].push_back(c);
+                            if(!coll_only) v[vo_sentence].push_back(c);
                             std::cout << COLL(c);
                             break;
                         }
@@ -827,9 +829,14 @@ int main()
                         else if(c == '}')
                         {
                             inside_coll = false;
+                            coll_only = false;
                             as = read_sentence;
                             putchar(c);
                             break;
+                        }
+                        else if(c == '-')
+                        {
+                            coll_only = true;
                         }
                         break;
                     }
