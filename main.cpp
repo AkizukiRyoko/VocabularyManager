@@ -110,6 +110,13 @@ std::string getWordClass(const std::string &c)
     return "unknown";
 }
 
+#define HEAD(x) FRONT_CYAN << (x) << FRONT_DEFAULT
+#define STCE(x) FRONT_GREEN << (x) << FRONT_DEFAULT
+#define COLL(x) FRONT_MAGENTA << (x) << FRONT_DEFAULT
+#define CLAS(x) FRONT_YELLOW << (x) << FRONT_DEFAULT
+#define DEFI(x) FRONT_WHITE << (x) << FRONT_DEFAULT
+#define CATE(x) FRONT_RED << (x) << FRONT_DEFAULT
+
 struct Word
 {
     std::string                             word; // water, sun, ...
@@ -121,7 +128,7 @@ struct Word
             void            print(std::ostream &s)
     {
         // word
-        s << FRONT_CYAN << word << FRONT_DEFAULT << "\n";
+        s << HEAD(word) << "\n";
         // defi
         if(defi.empty())
         {
@@ -489,10 +496,8 @@ int main()
         add_content,
         bad_state
     };
-    std::deque<std::string> word_stack;
-    std::deque<input_parse_state> state_stack;
-    state_stack.push_back(wait_input);
-    Word *cur = nullptr;
+    std::deque<std::pair<input_parse_state, std::vector<std::string>>> state_stack;
+    state_stack.emplace_back(std::make_pair(wait_input, std::vector<std::string>()));
     while((c = getchar()) != '!' && c != EOF)
     {
     begin_loop:
@@ -501,21 +506,19 @@ int main()
             std::cerr << "empty state stack." << std::endl;
             continue;
         }
-        switch(state_stack.back())
+        switch(state_stack.back().first)
         {
             case wait_input:
             {
                 if(isalpha(c))
                 {
-                    word_stack.emplace_back();
-                    state_stack.emplace_back(read_lookup_word);
+                    state_stack.emplace_back(std::make_pair(read_lookup_word, std::vector<std::string>()));
                     std::cerr << "lookup: ";
                     goto begin_loop; // let other section handle this char
                 }
                 if(c == '+')
                 {
-                    word_stack.emplace_back();
-                    state_stack.emplace_back(add_content);
+                    state_stack.emplace_back(std::make_pair(add_content, std::vector<std::string>()));
                     std::cerr << "add: ";
                     break;
                 }
@@ -523,29 +526,27 @@ int main()
             }
             case read_lookup_word:
             {
-                if(word_stack.empty())
-                {
-                    std::cerr << "empty word stack." << std::endl;
-                    break;
-                }
+                // make sure we have space to store chars
+                if(state_stack.back().second.empty()) state_stack.back().second.emplace_back();
+                auto &wdstr = state_stack.back().second[0];
                 if(c == '\n')
                 {
                     putchar('\n');
-                    if(!word_stack.back().empty())
+                    if(!wdstr.empty())
                     {
-                        auto i = word_map.find(word_stack.back());
+                        auto i = word_map.find(wdstr);
                         if(i == word_map.end())
                         {
-                            std::cerr << "word '" << FRONT_CYAN << word_stack.back() << FRONT_DEFAULT << "' not found." << std::endl;
-                            auto lb = word_map.lower_bound(word_stack.back());
+                            std::cerr << "word '" << HEAD(wdstr) << "' not found." << std::endl;
+                            auto lb = word_map.lower_bound(wdstr);
                             size_t count = 0;
-                            for(; lb != word_map.end() && lb->first.find(word_stack.back()) == 0; ++lb, ++count)
+                            for(; lb != word_map.end() && lb->first.find(wdstr) == 0; ++lb, ++count)
                             {
-                                std::cerr << "are you finding '" << FRONT_CYAN << lb->first << FRONT_DEFAULT << "'?" << std::endl;
+                                std::cerr << "are you finding '" << HEAD(lb->first) << "'?" << std::endl;
                             }
                             if(count == 1)
                             {
-                                std::cerr << "selecting '" << FRONT_CYAN << (--lb)->first << FRONT_DEFAULT << "'." << std::endl;
+                                std::cerr << "selecting '" << HEAD((--lb)->first) << "'." << std::endl;
                                 lb->second.print(std::cout);
                             }
                         }
@@ -554,24 +555,24 @@ int main()
                             i->second.print(std::cout);
                         }
                     }
-                    word_stack.pop_back();
                     state_stack.pop_back();
                     break;
                 }
                 else if(c == 127 || c == '\b')
                 {
-                    if(!word_stack.empty() && !word_stack.back().empty())
+                    if(!wdstr.empty())
                     {
                         std::cout << "\b \b";
-                        word_stack.back().pop_back();
+                        wdstr.pop_back();
                     }
                     break;
                 }
                 if(!isalpha(c)) break;
-                std::cout << FRONT_CYAN << c << FRONT_DEFAULT;
-                word_stack.back().push_back(c);
+                std::cout << HEAD(c);
+                wdstr.push_back(c);
                 break;
             }
+            /*
             // todo: this section assumes that there are no errors in input
             case add_content:
             {
@@ -600,7 +601,7 @@ int main()
                         if(isalpha(c))
                         {
                             word_stack.back().push_back(c);
-                            std::cout << FRONT_GREEN << c << FRONT_DEFAULT;
+                            std::cout << STCE(c);
                             break;
                         }
                         else if(c == ' ')
@@ -645,7 +646,7 @@ int main()
                         {
                             word_stack.back().push_back(c);
                             head_word.push_back(c);
-                            std::cout << FRONT_CYAN << c << FRONT_DEFAULT;
+                            std::cout << HEAD(c);
                             break;
                         }
                         else if(c == '\'' && head_word.empty())
@@ -685,23 +686,22 @@ int main()
                     {
                         auto &w = word_map[head_word];
                         w.word = head_word;
-                        std::cout << "editing word '" << FRONT_CYAN << head_word << FRONT_DEFAULT << "'." << std::endl;
+                        std::cout << "editing word '" << HEAD(head_word) << "'." << std::endl;
                         if(!definition.empty())
                         {
                             auto wcls = getWordClass(word_class);
                             w.defi.insert(std::make_pair(wcls, definition));
-                            std::cout << "definition added: (" << FRONT_YELLOW << wcls << FRONT_DEFAULT << ")"
-                                << FRONT_WHITE << definition << FRONT_DEFAULT << std::endl;
+                            std::cout << "definition added: (" << CLAS(wcls) << ")" << DEFI(definition) << std::endl;
                         }
                         if(!collocation.empty())
                         {
                             w.coll.insert(collocation);
-                            std::cout << "collocation added: " << FRONT_MAGENTA << collocation << FRONT_DEFAULT << std::endl;
+                            std::cout << "collocation added: " << COLL(ollocation) << std::endl;
                         }
                         if(!category.empty())
                         {
                             w.cate.insert(category);
-                            std::cout << "category added: " << FRONT_RED << category << FRONT_DEFAULT << std::endl;
+                            std::cout << "category added: " << CATE(category) << std::endl;
                         }
                     }
                     as = read_sentence;
@@ -713,6 +713,7 @@ int main()
                     state_stack.pop_back();
                 }
             }
+            */
         }
     }
 
