@@ -816,7 +816,7 @@ int main()
                             {
                                 putchar(c);
                                 v[vo_collocation].push_back(c);
-                                v[vo_sentence].push_back(c);
+                                if(!coll_only) v[vo_sentence].push_back(c);
                             }
                             break;
                         }
@@ -834,9 +834,11 @@ int main()
                             putchar(c);
                             break;
                         }
-                        else if(c == '-')
+                        else if(c == ':' && !coll_only)
                         {
                             coll_only = true;
+                            putchar(c);
+                            v[vo_collocation].push_back(c);
                         }
                         break;
                     }
@@ -917,7 +919,9 @@ int main()
                                 std::cout << "category added: " << CATE(sc) << std::endl;
                             }
                         }
-                        if(!v[vo_sentence].empty() && v[vo_sentence] != v[vo_collocation] && v[vo_sentence] != v[vo_head_word])
+                        auto i = v[vo_collocation].begin();
+                        for(; i != v[vo_collocation].end() && *i != ':'; ++i);
+                        if(!v[vo_sentence].empty() &&v[vo_sentence] != std::string(v[vo_collocation].begin(), i) && v[vo_sentence] != v[vo_head_word])
                         {
                             w.exam.insert(v[vo_sentence]);
                             std::cout << "example added: " << STCE(v[vo_sentence]) << std::endl;
