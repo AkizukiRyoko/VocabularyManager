@@ -463,12 +463,13 @@ int main()
     std::fstream file;
 
     file.open("dict", std::ios_base::in);
-    Word w;
-    while(file >> w)
+    Word wcache;
+    while(file >> wcache)
     {
-        word_map[w.word].word = w.word;
-        word_map[w.word].merge(w);
-        w = Word();
+        auto &w = word_map[wcache.word];
+        w.word = wcache.word;
+        w.merge(wcache);
+        wcache = Word();
     }
     file.close();
     
@@ -485,9 +486,7 @@ int main()
     {
         wait_input,
         read_lookup_word,
-        add_example,
-        read_collocation,
-        read_head_word,
+        add_content,
         bad_state
     };
     std::deque<std::string> word_stack;
@@ -515,8 +514,9 @@ int main()
                 }
                 if(c == '+')
                 {
-                    state_stack.emplace_back(add_example);
-                    std::cerr << "add example: ";
+                    word_stack.emplace_back();
+                    state_stack.emplace_back(add_content);
+                    std::cerr << "add: ";
                     break;
                 }
                 break;
@@ -571,6 +571,147 @@ int main()
                 std::cout << FRONT_CYAN << c << FRONT_DEFAULT;
                 word_stack.back().push_back(c);
                 break;
+            }
+            // todo: this section assumes that there are no errors in input
+            case add_content:
+            {
+                if(word_stack.empty())
+                {
+                    std::cerr << "empty word stack." << std::endl;
+                    break;
+                }
+                // todo: multiple categories
+                static std::string head_word, word_class, definition, collocation, category;
+                enum add_state
+                {
+                    read_sentence,
+                    read_head_word,
+                    read_definition,
+                    read_collocation,
+                    read_category,
+                    read_class,
+                    bad_state
+                };
+                static add_state as = read_sentence;
+                switch(as)
+                {
+                    case read_sentence:
+                    {
+                        if(isalpha(c))
+                        {
+                            word_stack.back().push_back(c);
+                            std::cout << FRONT_GREEN << c << FRONT_DEFAULT;
+                            break;
+                        }
+                        else if(c == ' ')
+                        {
+                            if(!word_stack.back().empty() && word_stack.back().back() != ' ')
+                            {
+                                putchar(' ');
+                                word_stack.back().push_back(' ');
+                            }
+                            break;
+                        }
+                        else if(c == '{')
+                        {
+                            as = read_collocation;
+                            putchar('{');
+                            break;
+                        }
+                        else if(c == '[')
+                        {
+                            as = read_head_word;
+                            putchar('[');
+                            break;
+                        }
+                        else if(c == 127 || c == '\b')
+                        {
+                            if(!word_stack.empty() && !word_stack.back().empty())
+                            {
+                                std::cout << "\b \b";
+                                char b = word_stack.back().back();
+                                // rollback reading state
+                                if(b == '}') as = read_collocation;
+                                else if(b == ']') as = read_head_word;
+                                word_stack.back().pop_back();
+                            }
+                            break;
+                        }
+                        break;
+                    }
+                    case read_head_word:
+                    {
+                        if(isalpha(c))
+                        {
+                            word_stack.back().push_back(c);
+                            head_word.push_back(c);
+                            std::cout << FRONT_CYAN << c << FRONT_DEFAULT;
+                            break;
+                        }
+                        else if(c == '\'' && head_word.empty())
+                        {
+                            as = read_category;
+                            putchar('\'');
+                            break;
+                        }
+                        else if(c == ']')
+                        {
+                            as = collocation.empty() ? read_sentence : read_collocation;
+                            putchar(']');
+                            break;
+                        }
+                        else if(c == 127 || c == '\b')
+                        {
+                            if(!word_stack.empty() && !word_stack.back().empty())
+                            {
+                                std::cout << "\b \b";
+                                char b = word_stack.back().back();
+                                // rollback reading state
+                                if(b == '\'') as = read_category;
+                                word_stack.back().pop_back();
+                            }
+                            break;
+                        }
+                        break;
+                    }
+                }
+                if(c == '\n')
+                {
+                    if(head_word.empty())
+                    {
+                        std::cerr << "no head word specified." << std::endl;
+                    }
+                    else
+                    {
+                        auto &w = word_map[head_word];
+                        w.word = head_word;
+                        std::cout << "editing word '" << FRONT_CYAN << head_word << FRONT_DEFAULT << "'." << std::endl;
+                        if(!definition.empty())
+                        {
+                            auto wcls = getWordClass(word_class);
+                            w.defi.insert(std::make_pair(wcls, definition));
+                            std::cout << "definition added: (" << FRONT_YELLOW << wcls << FRONT_DEFAULT << ")"
+                                << FRONT_WHITE << definition << FRONT_DEFAULT << std::endl;
+                        }
+                        if(!collocation.empty())
+                        {
+                            w.coll.insert(collocation);
+                            std::cout << "collocation added: " << FRONT_MAGENTA << collocation << FRONT_DEFAULT << std::endl;
+                        }
+                        if(!category.empty())
+                        {
+                            w.cate.insert(category);
+                            std::cout << "category added: " << FRONT_RED << category << FRONT_DEFAULT << std::endl;
+                        }
+                    }
+                    as = read_sentence;
+                    head_word.clear();
+                    word_class.clear();
+                    definition.clear();
+                    collocation.clear();
+                    word_stack.pop_back();
+                    state_stack.pop_back();
+                }
             }
         }
     }
