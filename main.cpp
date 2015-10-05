@@ -176,26 +176,26 @@ struct Word
             s << ":defi:\n";
             for(auto i = w.defi.begin(); i != w.defi.end(); ++i)
             {
-                s << "(" << i->first << ")" << i->second << ".\n";
+                s << "(" << i->first << ")" << i->second << "$\n";
             }
         }
         // coll
         if(!w.coll.empty())
         {
             s << ":coll:\n";
-            for(auto &c : w.coll) s << c << ".\n";
+            for(auto &c : w.coll) s << c << "$\n";
         }
         // exam
         if(!w.exam.empty())
         {
             s << ":exam:\n";
-            for(auto &c : w.exam) s << c << ".\n";
+            for(auto &c : w.exam) s << c << "$\n";
         }
         // cate
         if(!w.cate.empty())
         {
             s << ":cate:\n";
-            for(auto &c : w.cate) s << c << ".\n";
+            for(auto &c : w.cate) s << c << "$\n";
         }
         s << "]" << std::endl;
     }
@@ -347,7 +347,7 @@ struct Word
                 case seek_item_content:
                 {
                     if(isspace(c)) break;
-                    if(c == '.')
+                    if(c == '$')
                     {
                         state = seek_item_content;
                         std::cerr << "warning: blank item content." << std::endl;
@@ -370,7 +370,7 @@ struct Word
                 }
                 case read_item_content:
                 {
-                    if(c =='.')
+                    if(c =='$')
                     {
                         if(word_stack.empty())
                         {
