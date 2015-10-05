@@ -139,18 +139,18 @@ struct Word
             s << "[definitions]\n";
             for(auto i = defi.begin(); i != defi.end(); ++i)
             {
-                s << i->first << ": " << i->second << '\n';
+                s << CLAS(i->first) << ": " << DEFI(i->second) << '\n';
             }
         }
         // coll
         if(coll.empty()) s << "<no collocations>\n";
-        else { s << "[collocations]\n"; for(auto &c : coll) s << c << "\n"; }
+        else { s << "[collocations]\n"; for(auto &c : coll) s << COLL(c) << "\n"; }
         // exam
         if(exam.empty()) s << "<no examples>\n";
-        else { s << "[examples]\n"; for(auto &e : exam) s << e << "\n"; }
+        else { s << "[examples]\n"; for(auto &e : exam) s << STCE(e) << "\n"; }
         // cate
         if(cate.empty()) s << "<uncategorized>\n";
-        else { s << "[categories]\n"; for(auto &c : cate) s << c << "\n"; }
+        else { s << "[categories]\n"; for(auto &c : cate) s << CATE(c) << "\n"; }
     }
 
             void        merge(Word &w)
@@ -459,7 +459,7 @@ void disableNoncanonicalInput()
 
 void signalHandler(int /* signum */)
 {
-    std::cerr << "Received signal SIGINT, type '!' to exit." << std::endl;
+    std::cerr << "Received signal SIGINT, type '!' to exit, '~' to reset state." << std::endl;
 }
 
 int main()
@@ -505,6 +505,12 @@ int main()
         if(state_stack.empty())
         {
             std::cerr << "empty state stack." << std::endl;
+            continue;
+        }
+        if(c == '~' && state_stack.back().first != wait_input)
+        {
+            std::cerr << "reseting state." << std::endl;
+            state_stack.pop_back();
             continue;
         }
         switch(state_stack.back().first)
@@ -658,7 +664,6 @@ int main()
                 {
                     read_sentence,
                     read_head_word,
-                    read_head_word_with_coll,
                     read_definition,
                     read_collocation,
                     read_category,
@@ -668,7 +673,7 @@ int main()
                 auto &v = state_stack.back().second;
                 enum vector_data_order : size_t
                 {
-                    vo_raw,
+                    vo_state,
                     vo_sentence,
                     vo_head_word,
                     vo_word_class,
@@ -680,19 +685,20 @@ int main()
                 {
                     v.reserve(7);
                     v.insert(v.end(), 7, std::string());
-                    v[vo_raw].push_back(read_sentence);
+                    v[vo_state].push_back(read_sentence); // reading_state
+                    v[vo_state].push_back(0); // inside_coll
                 }
-                auto &as = v[vo_raw][0];
-                // todo: multiple categories
+                auto &as = v[vo_state][0];
+                char &inside_coll = v[vo_state][1];
+                // todo: multiple categories, handle backspaces
                 switch(as)
                 {
                     case read_sentence:
                     {
                         if(isalpha(c))
                         {
-                            v[vo_raw].push_back(c);
-                            v[vo_sentence].push_back(c);
                             std::cout << STCE(c);
+                            v[vo_sentence].push_back(c);
                             break;
                         }
                         else if(c == ' ')
@@ -700,7 +706,6 @@ int main()
                             if(!v[vo_sentence].empty() && v[vo_sentence].back() != ' ')
                             {
                                 putchar(c);
-                                v[vo_raw].push_back(c);
                                 v[vo_sentence].push_back(c);
                             }
                             break;
@@ -708,44 +713,14 @@ int main()
                         else if(c == '{')
                         {
                             putchar(c);
-                            v[vo_raw].push_back(c);
+                            inside_coll = true;
                             as = read_collocation;
                             break;
                         }
                         else if(c == '[')
                         {
                             putchar(c);
-                            v[vo_raw].push_back(c);
                             as = read_head_word;
-                            break;
-                        }
-                        else if(c == 127 || c == '\b')
-                        {
-                            if(!v[vo_sentence].empty())
-                            {
-                                std::cout << "\b \b";
-                                char b = v[vo_raw].back();
-                                // rollback reading state
-                                if(b == '}')
-                                {
-                                    as = read_collocation;
-                                    v[vo_raw].pop_back();
-                                }
-                                else if(b == ']')
-                                {
-                                    as = v[vo_definition].empty() ? read_head_word : read_definition;
-                                    v[vo_raw].push_back(c);
-                                }
-                                else if(isalpha(c))
-                                {
-                                    v[vo_sentence].pop_back();
-                                    v[vo_raw].push_back(c);
-                                }
-                                else
-                                {
-                                    std::cerr << "invalid char inputted last frame '" << c << "'." << std::endl;
-                                }
-                            }
                             break;
                         }
                         break;
@@ -755,6 +730,7 @@ int main()
                         if(isalpha(c))
                         {
                             v[vo_sentence].push_back(c);
+                            if(inside_coll) v[vo_collocation].push_back(c);
                             v[vo_head_word].push_back(c);
                             std::cout << HEAD(c);
                             break;
@@ -762,31 +738,112 @@ int main()
                         else if(c == '\'' && v[vo_head_word].empty())
                         {
                             as = read_category;
-                            putchar('\'');
+                            putchar(c);
                             break;
                         }
-                        else if(c == '(')
+                        else if(c == ':' && !v[vo_head_word].empty())
+                        {
+                            as = read_definition;
+                            putchar(c);
+                            break;
+                        }
+                        else if(c == ']' && !v[vo_head_word].empty())
+                        {
+                            as = inside_coll ? read_collocation : read_sentence; // exit current state
+                            putchar(c);
+                            break;
+                        }
+                        break;
+                    }
+                    case read_category:
+                    {
+                        if(isalpha(c))
+                        {
+                            v[vo_category].push_back(c);
+                            std::cout << CATE(c);
+                            break;
+                        }
+                        else if(c == ',' && !v[vo_category].empty() && v[vo_category].back() != ',')
+                        {
+                            v[vo_category].push_back(c);
+                            putchar(c);
+                            break;
+                        }
+                        else if(c == '\'' && !v[vo_category].empty())
+                        {
+                            as = read_head_word;
+                            putchar(c);
+                            break;
+                        }
+                        break;
+                    }
+                    case read_definition:
+                    {
+                        if(c == '(')
                         {
                             as = read_class;
-                            putchar('(');
+                            putchar(c);
                             break;
                         }
-                        else if(c == ']')
+                        else if(c == '.')
                         {
-                            as = read_sentence; // exit current state
-                            putchar(']');
+                            as = read_head_word;
+                            putchar(c);
                             break;
                         }
-                        else if(c == 127 || c == '\b')
+                        else if(isprint(c))
                         {
-                            if(!v[vo_head_word].empty())
+                            v[vo_definition].push_back(c);
+                            std::cout << DEFI(c);
+                            break;
+                        }
+                        break;
+                    }
+                    case read_collocation:
+                    {
+                        if(isalpha(c))
+                        {
+                            v[vo_collocation].push_back(c);
+                            v[vo_sentence].push_back(c);
+                            std::cout << COLL(c);
+                            break;
+                        }
+                        else if(c == ' ')
+                        {
+                            if(!v[vo_collocation].empty() && v[vo_collocation].back() != ' ')
                             {
-                                std::cout << "\b \b";
-                                //char b = word_stack.back().back();
-                                // rollback reading state
-                                //if(b == '\'') as = read_category;
-                                //word_stack.back().pop_back();
+                                putchar(c);
+                                v[vo_collocation].push_back(c);
+                                v[vo_sentence].push_back(c);
                             }
+                            break;
+                        }
+                        else if(c == '[')
+                        {
+                            as = read_head_word;
+                            putchar(c);
+                            break;
+                        }
+                        else if(c == '}')
+                        {
+                            inside_coll = false;
+                            as = read_sentence;
+                            putchar(c);
+                            break;
+                        }
+                        break;
+                    }
+                    case read_class:
+                    {
+                        if(isalpha(c))
+                        {
+                            v[vo_word_class].push_back(c);
+                            std::cout << CLAS(c);
+                            break;
+                        }
+                        else if(c == ')')
+                        {
+                            as = read_definition;
                             break;
                         }
                         break;
@@ -794,6 +851,7 @@ int main()
                 }
                 if(c == '\n')
                 {
+                    putchar(c);
                     if(v[vo_head_word].empty())
                     {
                         std::cerr << "no head word specified." << std::endl;
@@ -818,6 +876,11 @@ int main()
                         {
                             w.cate.insert(v[vo_category]);
                             std::cout << "category added: " << CATE(v[vo_category]) << std::endl;
+                        }
+                        if(!v[vo_sentence].empty())
+                        {
+                            w.exam.insert(v[vo_sentence]);
+                            std::cout << "example added: " << STCE(v[vo_sentence]) << std::endl;
                         }
                     }
                     state_stack.pop_back();
