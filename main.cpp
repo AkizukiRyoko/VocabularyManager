@@ -695,13 +695,7 @@ int main()
                 {
                     case read_sentence:
                     {
-                        if(isalpha(c))
-                        {
-                            std::cout << STCE(c);
-                            v[vo_sentence].push_back(c);
-                            break;
-                        }
-                        else if(c == ' ')
+                        if(c == ' ')
                         {
                             if(!v[vo_sentence].empty() && v[vo_sentence].back() != ' ')
                             {
@@ -721,6 +715,12 @@ int main()
                         {
                             putchar(c);
                             as = read_head_word;
+                            break;
+                        }
+                        else if(isprint(c))
+                        {
+                            std::cout << STCE(c);
+                            v[vo_sentence].push_back(c);
                             break;
                         }
                         break;
@@ -860,8 +860,15 @@ int main()
                     else
                     {
                         auto &w = word_map[v[vo_head_word]];
-                        w.word = v[vo_head_word];
-                        std::cout << "editing word '" << HEAD(v[vo_head_word]) << "'." << std::endl;
+                        if(w.word.empty())
+                        {
+                            w.word = v[vo_head_word];
+                            std::cout << "adding word '" << HEAD(v[vo_head_word]) << "'." << std::endl;
+                        }
+                        else
+                        {
+                            std::cout << "editing word '" << HEAD(v[vo_head_word]) << "'." << std::endl;
+                        }
                         if(!v[vo_definition].empty())
                         {
                             auto wcls = getWordClass(v[vo_word_class]);
@@ -878,7 +885,7 @@ int main()
                             w.cate.insert(v[vo_category]);
                             std::cout << "category added: " << CATE(v[vo_category]) << std::endl;
                         }
-                        if(!v[vo_sentence].empty())
+                        if(!v[vo_sentence].empty() && v[vo_sentence] != v[vo_collocation] && v[vo_sentence] != v[vo_head_word])
                         {
                             w.exam.insert(v[vo_sentence]);
                             std::cout << "example added: " << STCE(v[vo_sentence]) << std::endl;
