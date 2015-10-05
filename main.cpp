@@ -889,8 +889,19 @@ int main()
                         }
                         if(!v[vo_category].empty())
                         {
-                            w.cate.insert(v[vo_category]);
-                            std::cout << "category added: " << CATE(v[vo_category]) << std::endl;
+                            std::vector<std::string> scs;
+                            scs.emplace_back();
+                            for(auto i = v[vo_category].begin(); i != v[vo_category].end(); ++i)
+                            {
+                                if(*i == ',') scs.emplace_back();
+                                else scs.back().push_back(*i);
+                            }
+                            for(auto &sc : scs)
+                            {
+                                if(sc.empty()) continue;
+                                w.cate.insert(sc);
+                                std::cout << "category added: " << CATE(sc) << std::endl;
+                            }
                         }
                         if(!v[vo_sentence].empty() && v[vo_sentence] != v[vo_collocation] && v[vo_sentence] != v[vo_head_word])
                         {
