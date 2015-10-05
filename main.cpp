@@ -459,7 +459,7 @@ void disableNoncanonicalInput()
 
 void signalHandler(int /* signum */)
 {
-    std::cerr << "Received signal SIGINT, type '!' to exit, '~' to reset state." << std::endl;
+    std::cerr << "Received signal SIGINT, type '|' to exit, '~' to reset state." << std::endl;
 }
 
 int main()
@@ -499,7 +499,7 @@ int main()
     };
     std::deque<std::pair<input_parse_state, std::vector<std::string>>> state_stack;
     state_stack.emplace_back(std::make_pair(wait_input, std::vector<std::string>()));
-    while((c = getchar()) != '!' && c != EOF)
+    while((c = getchar()) != '|' && c != EOF)
     {
     begin_loop:
         if(state_stack.empty())
@@ -844,6 +844,7 @@ int main()
                         else if(c == ')')
                         {
                             as = read_definition;
+                            putchar(c);
                             break;
                         }
                         break;
